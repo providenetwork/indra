@@ -10,7 +10,7 @@ import {
   UnidirectionalTransferAppStateBigNumber,
 } from "@connext/types";
 import { RejectInstallVirtualMessage } from "@counterfactual/node";
-import { AppInstanceInfo, Node as NodeTypes } from "@counterfactual/types";
+import { AppInstanceJson, Node as NodeTypes } from "@counterfactual/types";
 import { Zero } from "ethers/constants";
 import { BigNumber } from "ethers/utils";
 
@@ -238,7 +238,7 @@ export class TransferController extends AbstractController {
     // great and should be removed
     await new Promise(async (res, rej) => {
       const getAppIds = async (): Promise<string[]> => {
-        return (await this.connext.getAppInstances()).map((a: AppInstanceInfo) => a.identityHash);
+        return (await this.connext.getAppInstances()).map((a: AppInstanceJson) => a.identityHash);
       };
       let retries = 0;
       while ((await getAppIds()).indexOf(this.appId) !== -1 && retries <= 5) {
