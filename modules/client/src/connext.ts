@@ -17,6 +17,7 @@ import {
   RegisteredAppDetails,
   ResolveConditionParameters,
   ResolveConditionResponse,
+  RpcType,
   SupportedApplication,
   SupportedNetwork,
   SwapParameters,
@@ -29,7 +30,7 @@ import {
   Node,
   NODE_EVENTS,
 } from "@counterfactual/node";
-import { Address, AppInstanceInfo, Node as NodeTypes, AppInstanceJson } from "@counterfactual/types";
+import { Address, AppInstanceJson, Node as NodeTypes } from "@counterfactual/types";
 import "core-js/stable";
 import { Contract, providers } from "ethers";
 import { AddressZero } from "ethers/constants";
@@ -37,7 +38,7 @@ import { BigNumber, HDNode, Network } from "ethers/utils";
 import tokenAbi from "human-standard-token-abi";
 import "regenerator-runtime/runtime";
 
-import { ChannelRouter, RpcType } from "./channelRouter";
+import { ChannelRouter } from "./channelRouter";
 import { ConditionalTransferController } from "./controllers/ConditionalTransferController";
 import { DepositController } from "./controllers/DepositController";
 import { ResolveConditionController } from "./controllers/ResolveConditionController";
@@ -114,26 +115,22 @@ export async function connect(opts: ClientOptions): Promise<ConnextInternal> {
   let channelRouter: ChannelRouter;
   let multisigAddress: string;
   if (channelProvider) {
-    // FIXME: many of the node methods need the user xpub for the route
-    // we will need some way for the channel provider to provide this
-    // to properly communicate with the hub
-    channelRouter = new ChannelRouter(RpcType.ChannelProvider, channelProvider!);
-    node.setUserPublicIdentifier(channelProvider!.publicIdentifier);
-    const myChannel = await node.getChannel();
-    if (!myChannel) {
-      throw new Error(
-        `Expected channel to exist when instantiating client with a channel provider.`,
-      );
-    }
-    multisigAddress = myChannel.multisigAddress;
+    // enable the channel provider, which sets the config property
+    await channelProvider.enable();
+    channelRouter = new ChannelRouter(
+      RpcType.ChannelProvider,
+      channelProvider!,
+      channelProvider.config,
+    );
+    node.setUserPublicIdentifier(channelProvider.config.publicIdentifier);
+    multisigAddress = channelProvider.config.multisigAddress;
   } else if (mnemonic) {
-    // TODO: we need to pass in the whole store to retain context. Figure out how to do this better
-    // Note: added this to the client since this is required for the cf module to work
     // generate extended private key from mnemonic
     const extendedXpriv = HDNode.fromMnemonic(mnemonic).extendedKey;
     await store.set([{ key: EXTENDED_PRIVATE_KEY_PATH, value: extendedXpriv }]);
     // create new cfModule to inject into internal instance
     console.log("creating new cf module");
+    // TODO: we need to pass in the whole store to retain context. Figure out how to do this better
     const cfModule = await Node.create(
       messaging,
       store,
@@ -145,7 +142,6 @@ export async function connect(opts: ClientOptions): Promise<ConnextInternal> {
     );
     node.setUserPublicIdentifier(cfModule.publicIdentifier);
     console.log("created cf module successfully");
-    channelRouter = new ChannelRouter(RpcType.CounterfactualNode, cfModule);
 
     // if instantiating client with cf, cannot assume that there
     // is already an established channel
@@ -167,9 +163,15 @@ export async function connect(opts: ClientOptions): Promise<ConnextInternal> {
       );
       console.log("create channel event data:", JSON.stringify(creationEventData, null, 2));
       multisigAddress = creationEventData.multisigAddress;
+
+      channelRouter = new ChannelRouter(RpcType.CounterfactualNode, cfModule, {
+        freeBalanceAddress: cfModule.freeBalanceAddress,
+        multisigAddress,
+        publicIdentifier: cfModule.publicIdentifier,
+      });
     }
   } else {
-    throw new Error("Must provide either a channelProvider or mnemonic upon instantiation")
+    throw new Error("Must provide either a channelProvider or mnemonic upon instantiation");
   }
 
   console.log("multisigAddress: ", multisigAddress);
@@ -692,9 +694,7 @@ export class ConnextInternal extends ConnextChannel {
       throw new Error(alreadyInstalled);
     }
 
-    return await this.channelRouter.installVirtualApp(appInstanceId, [
-      this.nodePublicIdentifier,
-    ]);
+    return await this.channelRouter.installVirtualApp(appInstanceId, [this.nodePublicIdentifier]);
   };
 
   public installApp = async (appInstanceId: string): Promise<NodeTypes.InstallResult> => {
@@ -728,10 +728,7 @@ export class ConnextInternal extends ConnextChannel {
       throw new Error(err);
     }
 
-    return await this.channelRouter.uninstallVirtualApp(
-      appInstanceId,
-      this.nodePublicIdentifier,
-    );
+    return await this.channelRouter.uninstallVirtualApp(appInstanceId, this.nodePublicIdentifier);
   };
 
   public rejectInstallApp = async (appInstanceId: string): Promise<NodeTypes.UninstallResult> => {
@@ -754,12 +751,7 @@ export class ConnextInternal extends ConnextChannel {
       throw new Error(err);
     }
 
-    return await this.channelRouter.withdraw(
-      amount,
-      this.multisigAddress,
-      assetId,
-      recipient,
-    );
+    return await this.channelRouter.withdraw(amount, this.multisigAddress, assetId, recipient);
   };
 
   ///////////////////////////////////
