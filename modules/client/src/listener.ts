@@ -17,6 +17,7 @@ import { AppInstanceInfo, Node as NodeTypes } from "@counterfactual/types";
 import { bigNumberify } from "ethers/utils";
 import { EventEmitter } from "events";
 
+import { ChannelRouter } from "./channelRouter";
 import { ConnextInternal } from "./connext";
 import { Logger } from "./lib/logger";
 import { appProposalValidation } from "./validation/appProposals";
@@ -28,7 +29,7 @@ type CallbackStruct = {
 
 export class ConnextListener extends EventEmitter {
   private log: Logger;
-  private cfModule: Node;
+  private channelRouter: ChannelRouter;
   private connext: ConnextInternal;
 
   // TODO: add custom parsing functions here to convert event data
@@ -48,7 +49,7 @@ export class ConnextListener extends EventEmitter {
       // if the from is us, ignore
       // FIXME: type of ProposeVirtualMessage should extend Node.NodeMessage,
       // which has a from field, but ProposeVirtualMessage does not
-      if ((data as any).from === this.cfModule.publicIdentifier) {
+      if ((data as any).from === this.channelRouter.publicIdentifier) {
         return;
       }
       // check based on supported applications
@@ -109,7 +110,7 @@ export class ConnextListener extends EventEmitter {
       // check if message is from us, return if so
       // FIXME: type of ProposeMessage should extend Node.NodeMessage, which
       // has a from field, but ProposeMessage does not
-      if ((data as any).from === this.cfModule.publicIdentifier) {
+      if ((data as any).from === this.channelRouter.publicIdentifier) {
         this.log.info(
           `Received proposal from our own node, doing nothing: ${JSON.stringify(data)}`,
         );
@@ -145,16 +146,16 @@ export class ConnextListener extends EventEmitter {
     },
   };
 
-  constructor(cfModule: Node, connext: ConnextInternal) {
+  constructor(channelRouter: ChannelRouter, connext: ConnextInternal) {
     super();
-    this.cfModule = cfModule;
+    this.channelRouter = channelRouter;
     this.connext = connext;
     this.log = new Logger("ConnextListener", connext.opts.logLevel);
   }
 
   public register = async (): Promise<void> => {
     await this.registerAvailabilitySubscription();
-    this.registerDefaultCfListeners();
+    this.registerDefaultListeners();
     return;
   };
 
@@ -162,7 +163,7 @@ export class ConnextListener extends EventEmitter {
     // replace with new fn
     this.log.info(`Registering listener for ${event}`);
     // TODO: type res by obj with event as keys?
-    this.cfModule.on(event, async (res: any) => {
+    this.channelRouter.on(event, async (res: any) => {
       await cb(res);
       this.emit(event, res);
     });
@@ -181,9 +182,9 @@ export class ConnextListener extends EventEmitter {
     }
   };
 
-  public registerDefaultCfListeners = (): void => {
+  public registerDefaultListeners = (): void => {
     Object.entries(this.defaultCallbacks).forEach(([event, callback]) => {
-      this.cfModule.on(NodeTypes.EventName[event], callback);
+      this.channelRouter.on(NodeTypes.EventName[event], callback);
     });
   };
 
