@@ -5,7 +5,7 @@ import {
   SimpleSwapAppStateBigNumber,
   SwapParameters,
 } from "@connext/types";
-import { AppInstanceInfo, Node as NodeTypes } from "@counterfactual/types";
+import { AppInstanceJson, Node as NodeTypes } from "@counterfactual/types";
 import { Zero } from "ethers/constants";
 import { BigNumber, bigNumberify, formatEther, parseEther } from "ethers/utils";
 import { fromExtendedKey } from "ethers/utils/hdnode";
@@ -203,19 +203,17 @@ export class SwapController extends AbstractController {
     // set app instance id
     this.appId = res.appInstanceId;
 
-    await new Promise(
-      (res: any, rej: any): any => {
-        boundReject = this.rejectInstallSwap.bind(null, rej);
-        boundResolve = this.resolveInstallSwap.bind(null, res);
-        this.listener.on(NodeTypes.EventName.INSTALL, boundResolve);
-        this.listener.on(NodeTypes.EventName.REJECT_INSTALL, boundReject);
-        // this.timeout = setTimeout(() => {
-        //   this.log.info("Install swap app timed out, rejecting install.")
-        //   this.cleanupInstallListeners(boundResolve, boundReject);
-        //   boundReject({ data: { appInstanceId: this.appId } });
-        // }, 5000);
-      },
-    );
+    await new Promise((res: any, rej: any): any => {
+      boundReject = this.rejectInstallSwap.bind(null, rej);
+      boundResolve = this.resolveInstallSwap.bind(null, res);
+      this.listener.on(NodeTypes.EventName.INSTALL, boundResolve);
+      this.listener.on(NodeTypes.EventName.REJECT_INSTALL, boundReject);
+      // this.timeout = setTimeout(() => {
+      //   this.log.info("Install swap app timed out, rejecting install.")
+      //   this.cleanupInstallListeners(boundResolve, boundReject);
+      //   boundReject({ data: { appInstanceId: this.appId } });
+      // }, 5000);
+    });
 
     this.cleanupInstallListeners(boundResolve, boundReject);
     return res.appInstanceId;
@@ -238,7 +236,7 @@ export class SwapController extends AbstractController {
     await new Promise(
       async (res: any, rej: any): Promise<any> => {
         const getAppIds = async (): Promise<string[]> => {
-          return (await this.connext.getAppInstances()).map((a: AppInstanceInfo) => a.identityHash);
+          return (await this.connext.getAppInstances()).map((a: AppInstanceJson) => a.identityHash);
         };
         let retries = 0;
         while ((await getAppIds()).indexOf(this.appId) !== -1 && retries <= 5) {
