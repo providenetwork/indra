@@ -130,6 +130,10 @@ class ChannelMessaging extends AbstractMessagingProvider {
     });
   }
 
+  async getTransferHistory(subject: string) {
+    
+  }
+
   setupSubscriptions(): void {
     super.connectRequestReponse("channel.get.>", this.getChannel.bind(this));
     super.connectRequestReponse("channel.create.>", this.createChannel.bind(this));
