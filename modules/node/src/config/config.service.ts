@@ -1,7 +1,8 @@
 import { MessagingConfig } from "@connext/messaging";
 import { ContractAddresses, KnownNodeAppNames } from "@connext/types";
 import { OutcomeType } from "@counterfactual/types";
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Wallet } from "ethers";
 import { JsonRpcProvider } from "ethers/providers";
 import { getAddress, Network as EthNetwork } from "ethers/utils";
 
@@ -34,11 +35,14 @@ const multiAssetMultiPartyCoinTransferEncoding = `
 `;
 
 @Injectable()
-export class ConfigService {
+export class ConfigService implements OnModuleInit {
   private readonly envConfig: { [key: string]: string };
+  private readonly ethProvider: JsonRpcProvider;
+  private wallet: Wallet;
 
   constructor() {
     this.envConfig = process.env;
+    this.ethProvider = new JsonRpcProvider(this.getEthRpcUrl());
   }
 
   get(key: string): string {
@@ -50,7 +54,11 @@ export class ConfigService {
   }
 
   getEthProvider(): JsonRpcProvider {
-    return new JsonRpcProvider(this.getEthRpcUrl());
+    return this.ethProvider;
+  }
+
+  getEthWallet(): Wallet {
+    return this.wallet;
   }
 
   async getEthNetwork(): Promise<EthNetwork> {
@@ -58,7 +66,7 @@ export class ConfigService {
     if (ethNetwork.name === "unknown" && ethNetwork.chainId === 4447) {
       ethNetwork.name = "ganache";
     } else if (ethNetwork.chainId === 1) {
-      ethNetwork.name = "mainnet";
+      ethNetwork.name = "homestead";
     }
     return ethNetwork;
   }
@@ -171,5 +179,10 @@ export class ConfigService {
       port: parseInt(this.get("INDRA_PG_PORT"), 10),
       username: this.get("INDRA_PG_USERNAME"),
     };
+  }
+
+  onModuleInit(): void {
+    const wallet = Wallet.fromMnemonic(this.getMnemonic());
+    this.wallet = wallet.connect(this.getEthProvider());
   }
 }
