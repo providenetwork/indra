@@ -55,3 +55,4 @@ modules/**/.circleci
 
 # Local packages
 counterfactual
+walletconnect
