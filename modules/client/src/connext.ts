@@ -135,7 +135,7 @@ export async function connect(opts: ClientOptions): Promise<ConnextInternal> {
   } else if (mnemonic) {
     // generate extended private key from mnemonic
     const extendedXpriv = HDNode.fromMnemonic(mnemonic).extendedKey;
-    await store.set([{ key: EXTENDED_PRIVATE_KEY_PATH, value: extendedXpriv }]);
+    await store.set([{ path: EXTENDED_PRIVATE_KEY_PATH, value: extendedXpriv }]);
     // create new cfModule to inject into internal instance
     console.log("creating new cf module");
     // TODO: we need to pass in the whole store to retain context. Figure out how to do this better
